@@ -23,7 +23,7 @@ with logo:
     st.image("images/logo.png")
 
 with title:
-    st.title("Dashboard Peta Interaktif Prediksi Persebaran Penyakit TBC Kota Surabaya Tahun 2024")
+    st.title("SIGMA-TB : SISTEM INFORMASI GEOGRAFIS UNTUK PEMODELAN MULTIMETODE RISIKO TUBERCULOSIS (STUDI KASUS : KOTA SURABAYA)")
 
 gdf_choro = gpd.read_file("Choroplet/Distribusi_Penyebaran_TBC_Tahun 2024.shp")
 if gdf_choro.crs is None:

@@ -18,7 +18,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 # ================================
 st.set_page_config(layout="wide")
 
-logo, title = st.columns([1, 9])
+logo, title = st.columns([2, 9])
 with logo:
     st.image("images/logo.png")
 
@@ -68,12 +68,12 @@ with tabs[0]:
         vmin, vmax = values.min(), values.max()
 
         colormap = LinearColormap(
-            colors=['#1a9850', '#fee08b', '#f46d43', '#d73027'],
+            colors=['#4B0055', '#813080', '#B266A3', '#D98CB3', '#F2C6D9'],
             vmin=vmin,
             vmax=vmax
         ).to_step(unique_vals)
 
-        m1 = folium.Map(location=center, zoom_start=10, tiles="Esri.WorldImagery")
+        m1 = folium.Map(location=center, zoom_start=10, tiles="Esri NatGeoWorldMap")
 
         def style_function(feature):
             kecamatan = feature["properties"]["NAMOBJ"]
@@ -105,14 +105,14 @@ with tabs[0]:
         return m1, colormap
 
     def map2(heatmap_model):
-        m2 = folium.Map(location=center, zoom_start=10, tiles="Esri.WorldImagery")
+        m2 = folium.Map(location=center, zoom_start=10, tiles="Esri NatGeoWorldMap")
 
         heat_data = [
             [point.y, point.x, weight]
             for point, weight in zip(gdf_heat.geometry, gdf_heat[heatmap_model])
             if not pd.isna(weight)
         ]
-        HeatMap(heat_data, radius=25, blur=15, max_zoom=13).add_to(m2)
+        HeatMap(heat_data, radius=35, blur=15, max_zoom=2).add_to(m2)
 
         folium.GeoJson(
             gdf_choro,
@@ -130,13 +130,13 @@ with tabs[0]:
                 labels=True,
             )
         ).add_to(m2)
-
+        
         return m2
-
+    
     with st.container():
         col1, col2 = st.columns(2)
         with col1:
-            col1, _ = st.columns([5,1])
+            col1, _ = st.columns([8,1])
             with col1:
                 st.subheader("🟡 Peta Choropleth TBC per Kecamatan")
                 choropleth_options = list(klasifikasi_label_map.keys())
@@ -148,7 +148,7 @@ with tabs[0]:
                 values = pd.to_numeric(gdf_choro[prediksi_field], errors='coerce')
                 vmin, vmax = values.min(), values.max()
 
-                colors = list(linear.RdYlGn_09.colors)[::-1]
+                colors = ['#4B0055', '#813080', '#B266A3', '#D98CB3', '#F2C6D9']
                 colormap = LinearColormap(colors, vmin=vmin, vmax=vmax).to_step(10)
                 colormap.caption = f"Prediksi TBC ({prediksi_field})"
                 colormap_html = colormap._repr_html_()
@@ -162,7 +162,7 @@ with tabs[0]:
                 )
 
         with col2:
-            col2_map, _ = st.columns([5, 1])
+            col2_map, _ = st.columns([8, 1])
 
             with col2_map:
                 st.subheader("🟡 Peta Heatmap TBC per Kecamatan")
@@ -211,10 +211,13 @@ with tabs[1]:
         }
 
     models = ["NB", "RF", "XGB"]
+    model_names = {"NB": "Negative Binomial", "RF": "Random Forest", "XGB": "XGBoost"}
+    colors = {"Aktual": "#6A5ACD", "Pred": "#00BFFF"}
     metrics = {model: model_metrics(df["Aktual"], df[f"{model}_Pred"]) for model in models}
 
     st.markdown("### 📈 Akurasi Model")
-    metrics_df = pd.DataFrame(metrics).T.rename(index={"NB": "Negative Binomial", "RF": "Random Forest", "XGB": "XGBoost"})
+    metrics_df = pd.DataFrame(metrics).T.rename(index=model_names)
+
     col1, col2, col3 = st.columns(3)
     col1.metric("📉 MAE Terendah", metrics_df["MAE"].idxmin(), f"{metrics_df['MAE'].min():.2f}")
     col2.metric("🔁 RMSE Terendah", metrics_df["RMSE"].idxmin(), f"{metrics_df['RMSE'].min():.2f}")
@@ -223,55 +226,91 @@ with tabs[1]:
     with st.expander("🔍 Lihat Tabel Evaluasi Lengkap"):
         st.dataframe(metrics_df.style.format("{:.2f}"))
 
+    # Grafik batang dalam expander
     st.markdown("### 📊 Visualisasi Nilai Aktual vs Prediksi per Kecamatan")
+    with st.expander("🔍 Klik untuk menampilkan grafik batang per model"):
+        col1, col2, col3 = st.columns(3)
+        for model, col in zip(models, [col1, col2, col3]):
+            fig, ax = plt.subplots(figsize=(4.5, 4), facecolor='black')
+            ax.set_facecolor('black')
 
-    col1, col2, col3 = st.columns(3)
-    model_names = {"NB": "Negative Binomial", "RF": "Random Forest", "XGB": "XGBoost"}
-    colors = {"Aktual": "#6A5ACD", "Pred": "#00BFFF"}
+            df_long = pd.DataFrame({
+                "Kecamatan": list(df["Kecamatan"]) * 2,
+                "Tipe": ["Aktual"] * len(df) + ["Prediksi"] * len(df),
+                "Jumlah Kasus": list(df["Aktual"]) + list(df[f"{model}_Pred"])
+            })
 
-    for model, col in zip(model_names.keys(), [col1, col2, col3]):
-        # Buat figure dengan background hitam
-        fig, ax = plt.subplots(figsize=(4.5, 4), facecolor='black')
-        ax.set_facecolor('black')  # Set background axis hitam
-        
-        df_long = pd.DataFrame({
-            "Kecamatan": list(df["Kecamatan"]) * 2,
-            "Tipe": ["Aktual"] * len(df) + ["Prediksi"] * len(df),
-            "Jumlah Kasus": list(df["Aktual"]) + list(df[f"{model}_Pred"])
-        })
+            sns.barplot(
+                data=df_long,
+                x="Kecamatan",
+                y="Jumlah Kasus",
+                hue="Tipe",
+                palette={"Aktual": colors["Aktual"], "Prediksi": colors["Pred"]},
+                ax=ax
+            )
 
-        # Plot dengan seaborn
-        sns.barplot(
-            data=df_long,
-            x="Kecamatan",
-            y="Jumlah Kasus",
-            hue="Tipe",
-            palette={"Aktual": colors["Aktual"], "Prediksi": colors["Pred"]},
-            ax=ax
-        )
+            ax.set_title(f"{model_names[model]}", fontsize=12, color='white')
+            ax.tick_params(axis='x', rotation=90, labelsize=7, colors='white')
+            ax.tick_params(axis='y', colors='white')
+            ax.set_xlabel("", color='white')
+            ax.set_ylabel("Jumlah Kasus TBC", color='white')
 
-        # Atur warna teks dan garis menjadi putih
-        ax.set_title(f"{model_names[model]}", fontsize=12, color='white')
-        ax.tick_params(axis='x', rotation=90, labelsize=7, colors='white')
-        ax.tick_params(axis='y', colors='white')
-        ax.set_xlabel("", color='white')
-        ax.set_ylabel("Jumlah Kasus TBC", color='white')
-        
-        # Atur legenda
-        legend = ax.legend(title="")
-        plt.setp(legend.get_texts(), color='white')  # Set warna teks legenda
-        plt.setp(legend.get_title(), color='white')  # Set warna judul legenda
-        
-        # Atur warna garis spine (bingkai)
-        for spine in ax.spines.values():
-            spine.set_edgecolor('white')
-        
-        col.pyplot(fig)
+            legend = ax.legend(title="")
+            plt.setp(legend.get_texts(), color='white')
+            plt.setp(legend.get_title(), color='white')
+
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+
+            col.pyplot(fig)
+
+    # Scatter plot dalam expander
+    st.subheader("📈 Visualisasi Scatter Plot Tiap Model")
+    with st.expander("🔍 Klik untuk menampilkan scatter plot per model"):
+        col1, col2, col3 = st.columns(3)
+        for model, col in zip(models, [col1, col2, col3]):
+            fig, ax = plt.subplots(figsize=(5, 4), facecolor='black')
+            ax.set_facecolor('black')
+
+            sns.regplot(
+                x=df["Aktual"],
+                y=df[f"{model}_Pred"],
+                scatter_kws={'color': colors["Aktual"]},
+                line_kws={'color': colors["Pred"]},
+                ax=ax
+            )
+
+            ax.set_title(f"{model_names[model]} - Sebaran Data", color='white')
+            ax.set_xlabel("Aktual", color='white')
+            ax.set_ylabel("Prediksi", color='white')
+            ax.tick_params(colors='white')
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+
+            col.pyplot(fig)
+
 
 # ================================
 # Tab 3: Data Lengkap
 # ================================
 with tabs[2]:
     st.markdown("### 📋 Data Lengkap Prediksi dan Error")
+
+    # Ubah nama kolom agar lebih deskriptif
+    df_renamed = df.rename(columns={
+        "NB_Pred": "Prediksi RBN",
+        "RF_Pred": "Prediksi Random Forest",
+        "XGB_Pred": "Prediksi XGBoost"
+    })
+
+    # Fungsi highlight berdasarkan nama kolom baru
+    def highlight_predictions(s):
+        color_map = {
+            'Prediksi RBN': 'background-color: #fc8d59',          # oranye-merah
+            'Prediksi Random Forest': 'background-color: #91bfdb',# biru langit
+            'Prediksi XGBoost': 'background-color: #d05ce3'       # ungu cerah
+        }
+        return [color_map.get(col, '') for col in s.index]
+
     with st.expander("📁 Klik untuk menampilkan seluruh data"):
-        st.dataframe(df.drop(columns=["NB_Pred", "RBN_Error"], errors='ignore'))
+        st.dataframe(df_renamed.style.apply(highlight_predictions, axis=1))
